@@ -1,5 +1,4 @@
 use color_eyre::Report;
-use std::ptr;
 use tracing::trace;
 use windows::Win32::{
     Media::Audio::{Endpoints::IAudioEndpointVolume, *},
@@ -23,7 +22,7 @@ impl VolCtrl {
             trace!("Getting default audio endpoint");
             let device = enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia)?;
             trace!("Getting volume controller");
-            let endpoint: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, Some(ptr::null()))?;
+            let endpoint: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, None)?;
 
             trace!("Generating new GUID");
             let guid = windows::core::GUID::new()?;
@@ -38,10 +37,14 @@ impl VolCtrl {
     #[allow(dead_code)]
     pub fn refresh_endpoint(&mut self) -> Result<(), Report> {
         unsafe {
+            CoInitialize(None)?;
+
             let enumerator: IMMDeviceEnumerator =
                 CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
             let device = enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia)?;
-            let endpoint: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, Some(ptr::null()))?;
+            let endpoint: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, None)?;
+
+            CoUninitialize();
 
             self.endpoint = endpoint
         }
