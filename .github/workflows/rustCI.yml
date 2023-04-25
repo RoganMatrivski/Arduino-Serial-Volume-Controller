@@ -12,6 +12,9 @@ defaults:
     # necessary for windows
     shell: bash
 
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -65,7 +68,7 @@ jobs:
           #   OS: ubuntu-latest
           # - TARGET: x86_64-apple-darwin
           #   OS: macos-latest
-          
+
           # - TARGET: i686-pc-windows-gnu # Not working for now
           #   OS: windows-latest
           - TARGET: i686-pc-windows-msvc # tested on a windows machine
