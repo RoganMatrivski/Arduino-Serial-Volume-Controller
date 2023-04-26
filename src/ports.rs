@@ -57,6 +57,11 @@ pub fn find_device() -> Result<Box<dyn SerialPort>, Report> {
             continue;
         }
 
+        debug!(
+            "Found Arduino Volume Controller at port {}!",
+            port.port_name
+        );
+
         return Ok(serial);
     }
 
