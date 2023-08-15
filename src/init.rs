@@ -9,6 +9,10 @@ pub struct Args {
     /// Verbosity log
     #[arg(short, long, action = clap::ArgAction::Count)]
     pub verbose: u8,
+
+    /// Scan port in sequence
+    #[arg(short = 's', long = "seq-scan")]
+    pub sequence_scan: bool,
 }
 
 const VERBOSE_LEVEL: &[&str] = &["info", "debug", "trace"];

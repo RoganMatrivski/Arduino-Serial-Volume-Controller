@@ -45,15 +45,18 @@ fn read_serial(
 #[cfg(target_os = "windows")]
 #[tokio::main]
 async fn main() -> Result<(), Report> {
-    // unsafe { windows::Win32::System::Com::CoInitialize(None)? };
-    init::initialize()?;
+    let args = init::initialize()?;
 
     use std::{thread::sleep, time::Duration};
 
     const SLEEP_DURATION_MS: u64 = 100;
     const SEND_RECV_RATIO: f32 = 2.0;
 
-    let serial = ports::find_device()?;
+    let serial = if !args.sequence_scan {
+        ports::find_device_async().await?
+    } else {
+        ports::find_device_sync()?
+    };
 
     let serial_id = {
         let mut serial = serial.try_clone()?;
@@ -73,7 +76,7 @@ async fn main() -> Result<(), Report> {
     let sender_join: JoinHandle<Result<(), Report>> = task::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
         loop {
-            // trace!("Sending new volume request: {serial_id_clone:?}");
+            trace!("Sending new volume request: {serial_id_clone:?}");
             write_serial(&mut serial_clone, &serial_id_clone[..8])?;
 
             tokio::time::sleep(Duration::from_millis(SLEEP_DURATION_MS)).await;
@@ -90,13 +93,14 @@ async fn main() -> Result<(), Report> {
 
         let mut prev_volume = volctrl.get_volume_level()?;
         let mut prev_mute = volctrl.get_volume_mute()?;
+
         loop {
-            // trace!("Cloning serial communicator");
+            trace!("Cloning serial communicator");
             let mut serial = serial.try_clone()?;
 
-            // trace!("Getting bytes to be read");
+            trace!("Getting bytes to be read");
             let to_read = serial.bytes_to_read()?;
-            // trace!("New bytes = {to_read}");
+            trace!("New bytes = {to_read}");
 
             if to_read < DATA_LENGTH as u32 {
                 sleep(Duration::from_millis(
@@ -132,17 +136,24 @@ async fn main() -> Result<(), Report> {
             sleep(Duration::from_millis(
                 (SLEEP_DURATION_MS as f32 / SEND_RECV_RATIO) as u64,
             ));
+
             // Really wanna use this. But this task will probably be sent to other thread
             // And VolCtrl can't be sent safely across.
             // tokio::time::sleep(SLEEP_DURATION).await;
         }
     });
 
+    // There was an attempt.
+    // tokio::select! {
+    //     _ = tokio::signal::ctrl_c() => {},
+    //     _ = sender_join => {},
+    //     _ = receiver_join => {},
+    // }
+
     let (sender_res, recv_res) = tokio::join!(sender_join, receiver_join);
     let _ = sender_res?;
     let _ = recv_res?;
 
-    // unsafe { windows::Win32::System::Com::CoUninitialize() };
     Ok(())
 }
 
