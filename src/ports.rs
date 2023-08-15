@@ -18,20 +18,24 @@ pub fn check_if_available(port_name: &str) -> Result<bool, Report> {
 #[tracing::instrument]
 pub fn find_device() -> Result<Box<dyn SerialPort>, Report> {
     debug!("Getting all serial devices");
-    let mut ports = serialport::available_ports()?;
-    ports.sort_by(|a, b| b.port_name.cmp(&a.port_name));
+    let ports = serialport::available_ports()?;
+    let mut ports = ports
+        .iter()
+        .map(|x| x.port_name.as_str())
+        .collect::<Vec<&str>>();
+    ports.sort_by(|a, b| b.cmp(a));
 
     for port in ports {
-        debug!(port_name = port.port_name, "Testing port");
-        let mut serial: Box<dyn SerialPort> = serialport::new(port.clone().port_name, 115_200)
+        debug!(port_name = port, "Testing port");
+        let mut serial: Box<dyn SerialPort> = serialport::new(port, 115_200)
             .timeout(std::time::Duration::from_millis(1000))
             .open()?;
 
-        trace!(port_name = port.port_name, "Writing to port");
+        trace!(port_name = port, "Writing to port");
         let written = serial.write(&DEVICE_SIGNATURE)?;
 
         if written < DEVICE_SIGNATURE.len() {
-            debug!(port_name = port.port_name, "Can't write to port");
+            debug!(port_name = port, "Can't write to port");
             continue;
         }
 
@@ -39,11 +43,7 @@ pub fn find_device() -> Result<Box<dyn SerialPort>, Report> {
         let read = serial.read(&mut readbuf)?;
 
         if read < 8 {
-            debug!(
-                port_name = port.port_name,
-                read_size = read,
-                "Mismatch read amount"
-            );
+            debug!(port_name = port, read_size = read, "Mismatch read amount");
             continue;
         }
 
@@ -51,16 +51,13 @@ pub fn find_device() -> Result<Box<dyn SerialPort>, Report> {
 
         if !DEVICE_SIGNATURE[1..].eq(recv_signature) {
             debug!(
-                port_name = port.port_name,
+                port_name = port,
                 "Invalid signature. Received: {recv_signature:?}. Expected {DEVICE_SIGNATURE:?}"
             );
             continue;
         }
 
-        debug!(
-            "Found Arduino Volume Controller at port {}!",
-            port.port_name
-        );
+        debug!("Found Arduino Volume Controller at port {}!", port);
 
         return Ok(serial);
     }
